@@ -9,15 +9,25 @@ CLOC_DIR="${2}"
 COMMIT="${3}"
 
 CLOC_FILE="${CLOC_DIR}/${COMMIT}.json"
+CLOC_TMP="${CLOC_FILE}.tmp"
+
+# Clean up temp file on any failure so a corrupt file never remains on disk
+trap 'rm -f "${CLOC_TMP}"' EXIT
 
 cd "${REPO_PATH}"
-cloc --json --out="${CLOC_FILE}" "${COMMIT}"
+
+# Write cloc output to temp file — never directly to the final location
+cloc --json --out="${CLOC_TMP}" "${COMMIT}"
 
 AUTHOR_DATE=$(git log -1 --format="%aI" "${COMMIT}")
 COMMIT_DATE=$(git log -1 --format="%cI" "${COMMIT}")
 
+# Enrich with git metadata; jq validates JSON as a side effect
 jq --arg author_date "${AUTHOR_DATE}" --arg commit_date "${COMMIT_DATE}" \
   '. + { commit: {author_date: $author_date, commit_date: $commit_date} }' \
-  "${CLOC_FILE}" > "${CLOC_FILE}.tmp"
+  "${CLOC_TMP}" > "${CLOC_TMP}.enriched"
 
-mv -f "${CLOC_FILE}.tmp" "${CLOC_FILE}"
+# Atomic move into final location — only reached if all steps succeeded
+mv -f "${CLOC_TMP}.enriched" "${CLOC_FILE}"
+rm -f "${CLOC_TMP}"
+trap - EXIT
