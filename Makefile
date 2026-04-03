@@ -1,3 +1,5 @@
+.PHONY: all test lint
+
 all:
 
 test:
