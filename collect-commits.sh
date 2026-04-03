@@ -4,8 +4,9 @@ set -e
 set -u
 
 usage() {
-    echo "Usage: $0 <repo-url>" >&2
+    echo "Usage: $0 <repo-url> [branch]" >&2
     echo "  repo-url  - git repository URL (https or ssh)" >&2
+    echo "  branch    - branch to analyse (default: main)" >&2
     echo "" >&2
     echo "Data is stored under .repos/<repo-name>/:" >&2
     echo "  git/          - bare git clone" >&2
@@ -14,11 +15,12 @@ usage() {
     exit 1
 }
 
-if [ $# -ne 1 ]; then
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
     usage
 fi
 
 REPO_URL="$1"
+BRANCH="${2:-main}"
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # Derive a stable directory name from the repo URL
@@ -32,21 +34,21 @@ mkdir -p "${REPO_DIR}" "${CLOC_DIR}"
 
 if [ -f "${REPO_PATH}/HEAD" ]; then
     echo "Fetching updates for ${REPO_NAME} ..."
-    git -C "${REPO_PATH}" fetch origin main
+    git -C "${REPO_PATH}" fetch origin "${BRANCH}"
 else
     echo "Cloning ${REPO_URL} into ${REPO_PATH} ..."
-    git clone --bare --single-branch --branch main "${REPO_URL}" "${REPO_PATH}"
+    git clone --bare --single-branch --branch "${BRANCH}" "${REPO_URL}" "${REPO_PATH}"
 fi
 
 cd "${REPO_PATH}"
-TOTAL=$(git rev-list --count main)
-EXISTING=$(git log --format="%H" main | while read -r C; do
+TOTAL=$(git rev-list --count "${BRANCH}")
+EXISTING=$(git log --format="%H" "${BRANCH}" | while read -r C; do
     [ -f "${CLOC_DIR}/${C}.json" ] && echo "${C}"
 done | wc -l)
 NEW=$((TOTAL - EXISTING))
 echo "Total commits: ${TOTAL}, already processed: ${EXISTING}, new: ${NEW}"
 
-git log --format="%H" main |  while read -r COMMIT; do
+git log --format="%H" "${BRANCH}" |  while read -r COMMIT; do
     if [ ! -f "${CLOC_DIR}/${COMMIT}.json" ]; then
         echo "${COMMIT}"
     fi
