@@ -1,6 +1,6 @@
 .PHONY: all test lint
 
-all:
+all: lint test
 
 test:
 	python -m pytest test_combine.py -v
