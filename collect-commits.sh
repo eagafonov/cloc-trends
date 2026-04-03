@@ -48,8 +48,8 @@ done | wc -l)
 NEW=$((TOTAL - EXISTING))
 echo "Total commits: ${TOTAL}, already processed: ${EXISTING}, new: ${NEW}"
 
-git log --format="%H" "${BRANCH}" |  while read -r COMMIT; do
+git log --format="%H" "${BRANCH}" | while read -r COMMIT; do
     if [ ! -f "${CLOC_DIR}/${COMMIT}.json" ]; then
-        echo "${COMMIT}"
+        "${SCRIPT_DIR}/cloc-commit.sh" "${REPO_PATH}" "${CLOC_DIR}" "${COMMIT}"
     fi
-done | xargs -r -L1 -P 10 "${SCRIPT_DIR}/cloc-commit.sh" "${REPO_PATH}" "${CLOC_DIR}"
+done
