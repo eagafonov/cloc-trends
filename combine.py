@@ -97,10 +97,13 @@ def commits(cloc_dir: Path):
         if not cloc_file.is_file():
             continue
         commit_sha = cloc_file.stem
-        with open(cloc_file, "r") as f:
-            data = json.load(f)
-
-        yield commit_sha, ClocReport.from_dict(data)
+        try:
+            with open(cloc_file, "r") as f:
+                data = json.load(f)
+            yield commit_sha, ClocReport.from_dict(data)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.warning(f"Skipping {cloc_file.name}: {e}")
+            continue
 
 
 def suppress_chatty_modules():
