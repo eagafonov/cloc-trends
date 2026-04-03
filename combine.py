@@ -137,15 +137,7 @@ def main(args):
         date_key = commit_info.commit.commit_date.date()
         commits_by_date[date_key].append((commit, commit_info))
 
-    # Build cumulative rows, one per day, using the last commit of each day
-    cumulative = {f"{lang}_files": 0 for lang in sorted_languages}
-    cumulative.update({f"{lang}_blank": 0 for lang in sorted_languages})
-    cumulative.update({f"{lang}_comment": 0 for lang in sorted_languages})
-    cumulative.update({f"{lang}_code": 0 for lang in sorted_languages})
-    cumulative.update(
-        {"total_files": 0, "total_blank": 0, "total_comment": 0, "total_code": 0}
-    )
-
+    # Build one row per day, using the last commit of each day as the snapshot
     total_commits = 0
 
     for date_key in sorted(commits_by_date.keys()):
@@ -175,23 +167,6 @@ def main(args):
             row["total_blank"] = last_commit_info.summary.blank
             row["total_comment"] = last_commit_info.summary.comment
             row["total_code"] = last_commit_info.summary.code
-
-        # Compute cumulative stats
-        for lang in sorted_languages:
-            stats = last_commit_info.languages.get(lang)
-            cumulative[f"{lang}_files"] = stats.nFiles if stats else 0
-            cumulative[f"{lang}_blank"] = stats.blank if stats else 0
-            cumulative[f"{lang}_comment"] = stats.comment if stats else 0
-            cumulative[f"{lang}_code"] = stats.code if stats else 0
-
-        if last_commit_info.summary:
-            cumulative["total_files"] = last_commit_info.summary.nFiles
-            cumulative["total_blank"] = last_commit_info.summary.blank
-            cumulative["total_comment"] = last_commit_info.summary.comment
-            cumulative["total_code"] = last_commit_info.summary.code
-
-        for key in cumulative:
-            row[f"cumulative_{key}"] = cumulative[key]
 
         rows.append(row)
 
