@@ -11,13 +11,15 @@ COMMIT="${3}"
 CLOC_FILE="${CLOC_DIR}/${COMMIT}.json"
 CLOC_TMP="${CLOC_FILE}.tmp"
 
+CLOC_TIMEOUT="${CLOC_TIMEOUT:-10}"
+
 # Clean up temp file on any failure so a corrupt file never remains on disk
 trap 'rm -f "${CLOC_TMP}"' EXIT
 
 cd "${REPO_PATH}"
 
 # Write cloc output to temp file — never directly to the final location
-cloc --json --out="${CLOC_TMP}" "${COMMIT}"
+cloc --json --out="${CLOC_TMP}" --timeout "${CLOC_TIMEOUT}" "${COMMIT}"
 
 AUTHOR_DATE=$(git log -1 --format="%aI" "${COMMIT}")
 COMMIT_DATE=$(git log -1 --format="%cI" "${COMMIT}")
