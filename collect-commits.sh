@@ -35,6 +35,7 @@ mkdir -p "${REPO_DIR}" "${CLOC_DIR}"
 if [ -f "${REPO_PATH}/HEAD" ]; then
     echo "Fetching updates for ${REPO_NAME} ..."
     git -C "${REPO_PATH}" fetch origin "${BRANCH}"
+    git -C "${REPO_PATH}" branch -f "${BRANCH}" FETCH_HEAD
 else
     echo "Cloning ${REPO_URL} into ${REPO_PATH} ..."
     git clone --bare --single-branch --branch "${BRANCH}" "${REPO_URL}" "${REPO_PATH}"
