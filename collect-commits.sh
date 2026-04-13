@@ -4,9 +4,10 @@ set -e
 set -u
 
 usage() {
-    echo "Usage: $0 <repo-url> [branch]" >&2
-    echo "  repo-url  - git repository URL (https or ssh)" >&2
-    echo "  branch    - branch to analyse (default: main)" >&2
+    echo "Usage: $0 <repo-url> [branch] [repo-name]" >&2
+    echo "  repo-url   - git repository URL (https or ssh)" >&2
+    echo "  branch     - branch to analyse (default: main)" >&2
+    echo "  repo-name  - override directory name (default: derived from URL)" >&2
     echo "" >&2
     echo "Data is stored under .repos/<repo-name>/:" >&2
     echo "  git/          - bare git clone" >&2
@@ -15,16 +16,16 @@ usage() {
     exit 1
 }
 
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
     usage
 fi
 
 REPO_URL="$1"
 BRANCH="${2:-main}"
+REPO_NAME="${3:-$(basename "${REPO_URL}" .git)}"
+
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-# Derive a stable directory name from the repo URL
-REPO_NAME=$(basename "${REPO_URL}" .git)
 CACHE_DIR="${PWD}/.repos"
 REPO_DIR="${CACHE_DIR}/${REPO_NAME}"
 REPO_PATH="${REPO_DIR}/git"
