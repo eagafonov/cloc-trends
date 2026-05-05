@@ -19,17 +19,6 @@ logger = logging.getLogger(__name__)
 CHATTY_MODULES = ["matplotlib.font_manager", "PIL.PngImagePlugin"]
 
 
-class ClocHeader(BaseModel):
-    cloc_url: str
-    cloc_version: str
-    elapsed_seconds: float
-    n_files: int
-    n_lines: int
-    files_per_second: float
-    lines_per_second: float
-    report_file: str
-
-
 class LanguageStats(BaseModel):
     nFiles: int
     blank: int
@@ -42,26 +31,44 @@ class CommitDates(BaseModel):
     commit_date: datetime
 
 
-class ClocReport(BaseModel):
-    header: ClocHeader
+class SccReport(BaseModel):
     commit: CommitDates
     languages: dict[str, LanguageStats] = {}
     summary: LanguageStats | None = None
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ClocReport":
-        header = data["header"]
+    def from_dict(cls, data: dict) -> "SccReport":
         commit = data["commit"]
-        reserved_keys = {"header", "commit", "SUM"}
-        languages = {
-            k: LanguageStats(**v) for k, v in data.items() if k not in reserved_keys
-        }
-        summary = data.get("SUM")
+        # scc output is an array of language objects stored under "languages"
+        raw_langs = data.get("languages", [])
+        languages = {}
+        total_files = 0
+        total_blank = 0
+        total_comment = 0
+        total_code = 0
+        for entry in raw_langs:
+            name = entry["Name"]
+            stats = LanguageStats(
+                nFiles=entry["Count"],
+                blank=entry["Blank"],
+                comment=entry["Comment"],
+                code=entry["Code"],
+            )
+            languages[name] = stats
+            total_files += stats.nFiles
+            total_blank += stats.blank
+            total_comment += stats.comment
+            total_code += stats.code
+        summary = LanguageStats(
+            nFiles=total_files,
+            blank=total_blank,
+            comment=total_comment,
+            code=total_code,
+        )
         return cls(
-            header=ClocHeader(**header),
             commit=CommitDates(**commit),
             languages=languages,
-            summary=LanguageStats(**summary) if summary else None,
+            summary=summary,
         )
 
 
@@ -71,7 +78,7 @@ def parser():
         "--repo-dir",
         type=str,
         required=True,
-        help="Path to the repo directory under .repos/<repo-name>/ (cloc data is in <repo-dir>/cloc/)",
+        help="Path to the repo directory under .repos/<repo-name>/ (scc data is in <repo-dir>/scc/)",
     )
     p.add_argument(
         "--repo-name",
@@ -86,23 +93,23 @@ def parser():
     return args
 
 
-def commits(cloc_dir: Path):
-    # Walk cloc dir, read <SHA>.json files, parse and yield them
-    # cloc_dir/
+def commits(scc_dir: Path):
+    # Walk scc dir, read <SHA>.json files, parse and yield them
+    # scc_dir/
     # ├── 00168394b123a4ef8c0ae993619f3c5ecce03437.json
     # ├── 00c0e93a4cfd0f2c5b4fbdd8d74114c998de382c.json
     # ├── 00c3b3ade67634eea0fdecd8e16b65c03f6d3804.json
 
-    for cloc_file in sorted(cloc_dir.glob("*.json")):
-        if not cloc_file.is_file():
+    for scc_file in sorted(scc_dir.glob("*.json")):
+        if not scc_file.is_file():
             continue
-        commit_sha = cloc_file.stem
+        commit_sha = scc_file.stem
         try:
-            with open(cloc_file, "r") as f:
+            with open(scc_file, "r") as f:
                 data = json.load(f)
-            yield commit_sha, ClocReport.from_dict(data)
+            yield commit_sha, SccReport.from_dict(data)
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.warning(f"Skipping {cloc_file.name}: {e}")
+            logger.warning(f"Skipping {scc_file.name}: {e}")
             continue
 
 
@@ -115,10 +122,10 @@ def main(args):
     logger.debug(f"Args: {args}")
 
     repo_dir = Path(args.repo_dir)
-    cloc_dir = repo_dir / "cloc"
+    scc_dir = repo_dir / "scc"
 
     all_commits = sorted(
-        commits(cloc_dir),
+        commits(scc_dir),
         key=lambda item: item[1].commit.commit_date,
     )
 
@@ -134,7 +141,7 @@ def main(args):
 
     # Group commits by date (using commit_date's date part)
 
-    commits_by_date: dict[datetime, list[tuple[str, ClocReport]]] = defaultdict(list)
+    commits_by_date: dict[datetime, list[tuple[str, SccReport]]] = defaultdict(list)
 
     for commit, commit_info in all_commits:
         date_key = commit_info.commit.commit_date.date()
@@ -175,7 +182,7 @@ def main(args):
 
     df = pd.DataFrame(rows)
 
-    csv_path = repo_dir / "cloc_summary.csv"
+    csv_path = repo_dir / "scc_summary.csv"
     df.to_csv(csv_path, index=False)
     logger.info(f"Saved CSV to {csv_path}")
 

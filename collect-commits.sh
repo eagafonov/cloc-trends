@@ -11,8 +11,8 @@ usage() {
     echo "" >&2
     echo "Data is stored under .repos/<repo-name>/:" >&2
     echo "  git/          - bare git clone" >&2
-    echo "  cloc/         - per-commit cloc JSON files" >&2
-    echo "  cloc_summary.csv / charts/  - combine.py outputs" >&2
+    echo "  scc/          - per-commit scc JSON files" >&2
+    echo "  scc_summary.csv / charts/  - combine.py outputs" >&2
     exit 1
 }
 
@@ -29,9 +29,9 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 CACHE_DIR="${PWD}/.repos"
 REPO_DIR="${CACHE_DIR}/${REPO_NAME}"
 REPO_PATH="${REPO_DIR}/git"
-CLOC_DIR="${REPO_DIR}/cloc"
+SCC_DIR="${REPO_DIR}/scc"
 
-mkdir -p "${REPO_DIR}" "${CLOC_DIR}"
+mkdir -p "${REPO_DIR}" "${SCC_DIR}"
 
 if [ -f "${REPO_PATH}/HEAD" ]; then
     echo "Fetching updates for ${REPO_NAME} ..."
@@ -45,13 +45,21 @@ fi
 cd "${REPO_PATH}"
 TOTAL=$(git rev-list --count "${BRANCH}")
 EXISTING=$(git log --format="%H" "${BRANCH}" | while read -r C; do
-    [ -f "${CLOC_DIR}/${C}.json" ] && echo "${C}"
+    [ -f "${SCC_DIR}/${C}.json" ] && echo "${C}"
 done | wc -l)
 NEW=$((TOTAL - EXISTING))
 echo "Total commits: ${TOTAL}, already processed: ${EXISTING}, new: ${NEW}"
 
+COMMIT_LIST=$(mktemp)
+trap 'rm -f "${COMMIT_LIST}"' EXIT
+
 git log --format="%H" "${BRANCH}" | while read -r COMMIT; do
-    if [ ! -f "${CLOC_DIR}/${COMMIT}.json" ]; then
-        "${SCRIPT_DIR}/cloc-commit.sh" "${REPO_PATH}" "${CLOC_DIR}" "${COMMIT}"
+    if [ ! -f "${SCC_DIR}/${COMMIT}.json" ]; then
+        echo "${COMMIT}"
     fi
-done
+done | sort -R > "${COMMIT_LIST}"
+
+P="${P:-1}"
+if [ -s "${COMMIT_LIST}" ]; then
+    xargs -P "${P}" -L 1 "${SCRIPT_DIR}/scc-commit.sh" "${REPO_PATH}" "${SCC_DIR}" < "${COMMIT_LIST}"
+fi
